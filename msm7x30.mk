@@ -23,6 +23,8 @@ $(call inherit-product, frameworks/native/build/phone-hdpi-512-dalvik-heap.mk)
 
 $(call inherit-product, device/common/gps/gps_eu_supl.mk)
 
+PRODUCT_BOOT_JARS += qcmediaplayer
+
 # These are the common hardware-specific features
 PRODUCT_COPY_FILES += \
     frameworks/native/data/etc/handheld_core_hardware.xml:system/etc/permissions/handheld_core_hardware.xml \
@@ -80,6 +82,7 @@ PRODUCT_COPY_FILES += \
 PRODUCT_PACKAGES += \
     audio.a2dp.default \
     audio.usb.default \
+    audio.r_submix.default \
     audio.primary.msm7x30 \
     audio_policy.msm7x30 \
     libaudio-resampler \
@@ -109,20 +112,31 @@ PRODUCT_PACKAGES += \
 # QCOM OMX
 PRODUCT_PACKAGES += \
     libstagefrighthw \
-    libmm-omxcore \
     libOmxCore \
     libOmxVdec \
     libOmxVenc \
     libc2dcolorconvert
+
+# qcmediaplayer
+PRODUCT_PACKAGES += qcmediaplayer
 
 # Misc
 PRODUCT_PACKAGES += \
     com.android.future.usb.accessory \
     Torch
 
-# WiFi
+# Live wallpapers
 PRODUCT_PACKAGES += \
-    libnetcmdiface
+    Galaxy4 \
+    HoloSpiralWallpaper \
+    LiveWallpapers \
+    LiveWallpapersPicker \
+    MagicSmokeWallpapers \
+    NoiseField \
+    PhaseBeam \
+    VisualizationWallpapers \
+    PhotoTable \
+    PhotoPhase
 
 # we have enough storage space to hold precise GC data
 PRODUCT_TAGS += dalvik.gc.type-precise
@@ -150,7 +164,6 @@ PRODUCT_PROPERTY_OVERRIDES += \
 # Graphics
 PRODUCT_PROPERTY_OVERRIDES += \
     debug.sf.hw=1 \
-    debug.egl.hw=1 \
     debug.composition.type=dyn \
     persist.hwc.mdpcomp.enable=false \
     debug.mdpcomp.maxlayer=3 \
@@ -163,7 +176,17 @@ PRODUCT_PROPERTY_OVERRIDES += \
 
 # Low Power Audio
 PRODUCT_PROPERTY_OVERRIDES += \
-    lpa.decode=true
+    lpa.decode=false \
+    use.non-omx.mp3.decoder=false \
+    use.non-omx.aac.decoder=false
+
+# Resampler quality
+PRODUCT_PROPERTY_OVERRIDES += \
+    af.resampler.quality=4
+
+# Disable gapless mode
+PRODUCT_PROPERTY_OVERRIDES += \
+    audio.gapless.playback.disable=true
 
 # Set default USB interface
 PRODUCT_PROPERTY_OVERRIDES += \
@@ -171,7 +194,7 @@ PRODUCT_PROPERTY_OVERRIDES += \
 
 # Increase speed for UMS transfer
 PRODUCT_PROPERTY_OVERRIDES += \
-    ro.vold.umsdirtyratio=50
+    ro.vold.umsdirtyratio=20
 
 # Enable repeatable keys in CWM
 PRODUCT_PROPERTY_OVERRIDES += \
@@ -185,6 +208,19 @@ PRODUCT_PROPERTY_OVERRIDES += \
 # features that work poorly on low-memory devices.
 PRODUCT_PROPERTY_OVERRIDES += \
     ro.config.low_ram=true
+
+# Reduce background apps limit to 16 on low-tier devices
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.sys.fw.bg_apps_limit=16
+
+# Set max background services
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.config.max_starting_bg=8
+
+# Disable strict mode
+PRODUCT_PROPERTY_OVERRIDES += \
+    persist.sys.strictmode.visual=0 \
+    persist.sys.strictmode.disable=1
 
 # proprietary side of the board
 $(call inherit-product, vendor/semc/msm7x30-common/msm7x30-common-vendor.mk)

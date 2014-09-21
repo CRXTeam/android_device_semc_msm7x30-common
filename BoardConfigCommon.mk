@@ -33,9 +33,6 @@ TARGET_CPU_ABI := armeabi-v7a
 TARGET_CPU_ABI2 := armeabi
 TARGET_CPU_VARIANT := scorpion
 
-# Low memory device
-TARGET_ARCH_LOWMEM := true
-
 # Qualcomm Hardware
 BOARD_USES_QCOM_HARDWARE := true
 TARGET_USES_QCOM_BSP := true
@@ -49,14 +46,17 @@ TARGET_PROVIDES_LIBLIGHT := true
 USE_OPENGL_RENDERER := true
 TARGET_USES_ION := true
 TARGET_USES_C2D_COMPOSITION := true
-TARGET_DISPLAY_USE_RETIRE_FENCE := true
 TARGET_DISPLAY_INSECURE_MM_HEAP := true
 BOARD_EGL_CFG := device/semc/msm7x30-common/rootdir/system/etc/egl.cfg
 TARGET_NO_INITLOGO := true
 
+# Screenrecord
+BOARD_SCREENRECORD_LANDSCAPE_ONLY := true
+
 # Audio
 TARGET_QCOM_AUDIO_VARIANT := caf
 BOARD_USES_LEGACY_ALSA_AUDIO := true
+BOARD_HAVE_SEMC_AUDIO := true
 
 # GPS
 BOARD_USES_QCOM_GPS := true
@@ -69,10 +69,10 @@ BOARD_HAVE_BLUETOOTH := true
 # Camera
 TARGET_DISABLE_ARM_PIE := true
 BOARD_NEEDS_MEMORYHEAPPMEM := true
-BOARD_USES_PMEM_ADSP := true
 COMMON_GLOBAL_CFLAGS += -DSEMC_ICS_CAMERA_BLOB -DNEEDS_VECTORIMPL_SYMBOLS
 
 # Recovery
+TARGET_NO_SEPARATE_RECOVERY := true
 TARGET_RECOVERY_PIXEL_FORMAT := "RGBX_8888"
 BOARD_CUSTOM_BOOTIMG_MK := device/semc/msm7x30-common/custombootimg.mk
 TARGET_RECOVERY_PRE_COMMAND := "/sbin/pre-recovery.sh"
@@ -87,6 +87,7 @@ TARGET_KERNEL_SOURCE := kernel/semc/msm7x30
 BOARD_KERNEL_CMDLINE := # This is ignored by sony's bootloader
 BOARD_KERNEL_BASE := 0x00200000
 BOARD_KERNEL_PAGESIZE := 131072
+TARGET_RELEASETOOLS_EXTENSIONS := device/semc/msm7x30-common
 
 # We don't build bootloader nor radio
 TARGET_NO_BOOTLOADER := true
@@ -105,9 +106,7 @@ SOMC_CFG_SENSORS_COMPASS_AK8975 := yes
 SOMC_CFG_SENSORS_LIGHT_AS3676 := yes
 SOMC_CFG_SENSORS_LIGHT_AS3676_PATH := "/sys/devices/i2c-0/0-0040"
 SOMC_CFG_SENSORS_LIGHT_AS3676_MAXRANGE := 9000
-
-# A custom ota package maker for a device without an exposed boot partition
-TARGET_RELEASETOOL_OTA_FROM_TARGET_SCRIPT := device/semc/msm7x30-common/releasetools/semc_ota_from_target_files
+SOMC_CFG_SENSORS_LIGHT_AS3676_DISABLE_ALS_SWITCH := yes
 
 # CM Hardware tunables
 BOARD_HARDWARE_CLASS := device/semc/msm7x30-common/cmhw

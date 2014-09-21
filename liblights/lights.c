@@ -32,28 +32,42 @@
 #include <sys/types.h>
 
 #include <hardware/lights.h>
-#ifndef NO_BUTTON_BACKLIGHT
-#include "semc_lights.h"
+
+char const*const LCD_BACKLIGHT_FILE      = "/sys/class/leds/lcd-backlight/brightness";
+
+#ifdef HAVE_BUTTON_BACKLIGHT
+char const*const BUTTON_BACKLIGHT_FILE   = "/sys/class/leds/button-backlight/brightness";
+#endif
+#ifdef HAVE_KEYBOARD_BACKLIGHT
+char const*const KEYBOARD_BACKLIGHT_FILE = "/sys/class/leds/keyboard-backlight/brightness";
+#endif
+#ifdef HAVE_MUSIC_LIGHT
+char const*const MUSIC_LIGHT_FILE        = "/sys/class/leds/music-light/brightness";
 #endif
 
-char const*const LCD_BACKLIGHT_FILE = "/sys/class/leds/lcd-backlight/brightness";
-char const*const RED_LED_FILE       = "/sys/class/leds/red/brightness";
-char const*const GREEN_LED_FILE     = "/sys/class/leds/green/brightness";
-char const*const BLUE_LED_FILE      = "/sys/class/leds/blue/brightness";
+char const*const RED_LED_FILE            = "/sys/class/leds/red/brightness";
+char const*const GREEN_LED_FILE          = "/sys/class/leds/green/brightness";
+char const*const BLUE_LED_FILE           = "/sys/class/leds/blue/brightness";
 
-char const*const LED_FILE_TRIGGER[]  = {
-  "/sys/class/leds/red/use_pattern",
-  "/sys/class/leds/green/use_pattern",
-  "/sys/class/leds/blue/use_pattern"
+char const*const LED_FILE_TRIGGER[] = {
+  "/sys/class/leds/red/trigger",
+  "/sys/class/leds/green/trigger",
+  "/sys/class/leds/blue/trigger"
 };
 
-char const*const LED_FILE_PATTERN     = "/sys/devices/i2c-0/0-0040/pattern_data";
-char const*const LED_FILE_REPEATDELAY = "/sys/devices/i2c-0/0-0040/pattern_delay";
-char const*const LED_FILE_PATTERNLEN  = "/sys/devices/i2c-0/0-0040/pattern_duration_secs";
-char const*const LED_FILE_DIMONOFF    = "/sys/devices/i2c-0/0-0040/pattern_use_softdim";
-char const*const LED_FILE_DIMTIME     = "/sys/devices/i2c-0/0-0040/dim_time";
+char const*const LED_FILE_DELAYON[] = {
+  "/sys/class/leds/red/delay_on",
+  "/sys/class/leds/green/delay_on",
+  "/sys/class/leds/blue/delay_on"
+};
 
-const int LCD_BRIGHTNESS_MIN = 1;
+char const*const LED_FILE_DELAYOFF[] = {
+  "/sys/class/leds/red/delay_off",
+  "/sys/class/leds/green/delay_off",
+  "/sys/class/leds/blue/delay_off"
+};
+
+const int LCD_BRIGHTNESS_MIN = 5;
 
 char const*const ON  = "1";
 char const*const OFF = "0";
@@ -159,15 +173,13 @@ static int set_light_backlight (struct light_device_t *dev, struct light_state_t
 
 static int set_light_buttons (struct light_device_t *dev, struct light_state_t const* state) {
 	int err = 0;
-#ifndef NO_BUTTON_BACKLIGHT
+#ifdef HAVE_BUTTON_BACKLIGHT
 	size_t i = 0;
 	int brightness = rgb_to_brightness(state);
 
 	pthread_mutex_lock(&g_lock);
 	ALOGV("%s brightness = %d", __func__, brightness);
-	for (i = 0; i < sizeof(BUTTON_BACKLIGHT_FILE)/sizeof(BUTTON_BACKLIGHT_FILE[0]); i++) {
-		err |= write_int (BUTTON_BACKLIGHT_FILE[i], brightness);
-	}
+	err |= write_int (BUTTON_BACKLIGHT_FILE, brightness);
 	pthread_mutex_unlock(&g_lock);
 #endif
 	return err;
@@ -181,9 +193,7 @@ static int set_light_keyboard (struct light_device_t* dev, struct light_state_t 
 
 	pthread_mutex_lock(&g_lock);
 	ALOGV("%s brightness = %d", __func__, brightness);
-	for (i = 0; i < sizeof(KEYBOARD_BACKLIGHT_FILE)/sizeof(KEYBOARD_BACKLIGHT_FILE[0]); i++) {
-		err |= write_int (KEYBOARD_BACKLIGHT_FILE[i], brightness);
-	}
+	err |= write_int (KEYBOARD_BACKLIGHT_FILE, brightness);
 	pthread_mutex_unlock(&g_lock);
 #endif
 	return err;
@@ -197,9 +207,7 @@ static int set_light_music (struct light_device_t* dev, struct light_state_t con
 
 	pthread_mutex_lock(&g_lock);
 	ALOGV("%s brightness = %d", __func__, brightness);
-	for (i = 0; i < sizeof(MUSIC_LIGHT_FILE)/sizeof(MUSIC_LIGHT_FILE[0]); i++) {
-		err |= write_int (MUSIC_LIGHT_FILE[i], brightness);
-	}
+	err |= write_int (MUSIC_LIGHT_FILE, brightness);
 	pthread_mutex_unlock(&g_lock);
 #endif
 	return err;
@@ -207,13 +215,8 @@ static int set_light_music (struct light_device_t* dev, struct light_state_t con
 
 static void set_shared_light_locked (struct light_device_t *dev, struct light_state_t *state) {
 	int r, g, b;
+	int delayOn, delayOff;
 	size_t i = 0;
-
-	uint32_t pattern = 0;
-	uint32_t patbits = 0;
-	uint32_t numbits, delayshift;
-
-	char patternstr[11];
 
 	ALOGV("color 0x%x", state->color);
 
@@ -221,57 +224,28 @@ static void set_shared_light_locked (struct light_device_t *dev, struct light_st
 	g = (state->color >> 8) & 0xFF;
 	b = (state->color) & 0xFF;
 
-	ALOGV("flashOn = %d, flashOff = %d", state->flashOnMS, state->flashOffMS);
+	delayOn = state->flashOnMS;
+	delayOff = state->flashOffMS;
 
-	if (state->flashOnMS == 1)
+	ALOGV("flashOn = %d, flashOff = %d", delayOn, delayOff);
+
+	if (delayOn == 1)
 		state->flashMode = LIGHT_FLASH_NONE;
-	else {
-		numbits = state->flashOnMS / 250;
-		delayshift = state->flashOffMS / 250;
-
-		// Make sure we never do 0 on time
-		if (numbits == 0)
-			numbits = 1;
-
-		// Always make sure period is >2x the on time, we don't support
-		// more than 50% duty cycle
-		if (delayshift < numbits * 2)
-			delayshift = numbits * 2;
-
-		ALOGV("numbits = %d, delayshift = %d", numbits, delayshift);
-
-		patbits = ((uint32_t)1 << numbits) - 1;
-		ALOGV("patbits = 0x%x", patbits);
-
-		for (i = 0; i < 32; i += delayshift) {
-			pattern = pattern | (patbits << i);
-		}
-
-		ALOGV("pattern = 0x%x", pattern);
-
-		snprintf(patternstr, 11, "0x%x", pattern);
-
-		ALOGV("patternstr = %s", patternstr);
-	}
 
 	switch (state->flashMode) {
 	case LIGHT_FLASH_TIMED:
 	case LIGHT_FLASH_HARDWARE:
 		for (i = 0; i < sizeof(LED_FILE_TRIGGER)/sizeof(LED_FILE_TRIGGER[0]); i++) {
-			write_string (LED_FILE_TRIGGER[i], ON);
+			write_string (LED_FILE_TRIGGER[i], "timer");
+			write_int (LED_FILE_DELAYON[i], delayOn);
+			write_int (LED_FILE_DELAYOFF[i], delayOff);
 		}
-		write_string (LED_FILE_DIMONOFF, ON);
-		write_int (LED_FILE_DIMTIME, numbits * 125);
-		write_string (LED_FILE_PATTERN, patternstr);
-		write_int (LED_FILE_PATTERNLEN, 8);
-		write_int (LED_FILE_REPEATDELAY, 0);
 		break;
 
 	case LIGHT_FLASH_NONE:
 		for (i = 0; i < sizeof(LED_FILE_TRIGGER)/sizeof(LED_FILE_TRIGGER[0]); i++) {
-			write_string (LED_FILE_TRIGGER[i], OFF);
+			write_string (LED_FILE_TRIGGER[i], "none");
 		}
-		write_string (LED_FILE_DIMONOFF, OFF);
 		break;
 	}
 
