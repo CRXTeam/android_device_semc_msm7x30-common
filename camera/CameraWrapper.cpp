@@ -34,6 +34,7 @@
 #include <camera/Camera.h>
 #include <camera/CameraParameters.h>
 
+#ifndef ZEUS_DEVICE
 /* SEMC parameter names */
 static char KEY_EX_VIDEO_STABILIZER[] = "semc-vs";
 static char KEY_EX_SUPPORTED_VIDEO_STABILIZERS[] = "semc-vs-values";
@@ -53,7 +54,7 @@ static char KEY_QC_SUPPORTED_DIS_MODES[] = "dis-values";
 /* QCOM parameter values */
 static char KEY_QC_DIS_ENABLE[] = "enable";
 static char KEY_QC_DIS_DISABLE[] = "disable";
-
+#endif
 
 static android::Mutex gCameraWrapperLock;
 static camera_module_t *gVendorModule = 0;
@@ -114,6 +115,7 @@ static int check_vendor_module()
     return rv;
 }
 
+#ifndef ZEUS_DEVICE
 void camera_fixup_capability(android::CameraParameters *params)
 {
     ALOGV("%s", __FUNCTION__);
@@ -133,6 +135,7 @@ void camera_fixup_capability(android::CameraParameters *params)
         params->set(android::CameraParameters::KEY_SUPPORTED_AUTO_EXPOSURE, buffer);
     }
 }
+#endif
 
 static char *camera_fixup_getparams(int id, const char *settings)
 {
@@ -144,6 +147,7 @@ static char *camera_fixup_getparams(int id, const char *settings)
     params.dump();
 #endif
 
+#ifndef ZEUS_DEVICE
     /* Back Camera */
     if (id == 0) {
         camera_fixup_capability(&params);
@@ -191,6 +195,7 @@ static char *camera_fixup_getparams(int id, const char *settings)
     if (multiFocusNum) {
         params.set(android::CameraParameters::KEY_MAX_NUM_FOCUS_AREAS, multiFocusNum);
     }
+#endif
 
 #if !LOG_NDEBUG
     ALOGV("%s: fixed parameters:", __FUNCTION__);
@@ -213,6 +218,7 @@ static char *camera_fixup_setparams(int id, const char *settings)
     params.dump();
 #endif
 
+#ifndef ZEUS_DEVICE
     /* Video recording mode */
     const char *recordingHint = params.get(android::CameraParameters::KEY_RECORDING_HINT);
     if (recordingHint) {
@@ -242,19 +248,6 @@ static char *camera_fixup_setparams(int id, const char *settings)
             params.set(KEY_EX_METERING_MODE, "center-weighted");
         } else if (strcmp(meteringMode, android::CameraParameters::AUTO_EXPOSURE_SPOT_METERING) == 0) {
             params.set(KEY_EX_METERING_MODE, "spot");
-        }
-    }
-
-#ifdef USES_AS3676_TORCH
-    /* HACK - Fix urushi as3676 torch */
-    const char *flashMode = params.get(android::CameraParameters::KEY_FLASH_MODE);
-    if (flashMode) {
-        if (strcmp(flashMode, android::CameraParameters::FLASH_MODE_TORCH) == 0) {
-            system("echo 255 > /sys/class/leds/torch-rgb1/brightness");
-            system("echo 255 > /sys/class/leds/torch-rgb2/brightness");
-        } else if (strcmp(flashMode, android::CameraParameters::FLASH_MODE_OFF) == 0) {
-            system("echo 0 > /sys/class/leds/torch-rgb1/brightness");
-            system("echo 0 > /sys/class/leds/torch-rgb2/brightness");
         }
     }
 #endif
@@ -461,7 +454,7 @@ static int camera_take_picture(struct camera_device *device)
     if (!device)
         return -EINVAL;
 
-    return VENDOR_CALL(device, take_picture);;
+    return VENDOR_CALL(device, take_picture);
 }
 
 static int camera_cancel_picture(struct camera_device *device)
@@ -566,12 +559,6 @@ static int camera_device_close(hw_device_t *device)
         ret = -EINVAL;
         goto done;
     }
-
-#ifdef USES_AS3676_TORCH
-    /* HACK - Fix urushi as3676 torch */
-    system("echo 0 > /sys/class/leds/torch-rgb1/brightness");
-    system("echo 0 > /sys/class/leds/torch-rgb2/brightness");
-#endif
 
     wrapper_dev = (wrapper_camera_device_t*) device;
 
